@@ -117,16 +117,31 @@ public extension OAuth {
             state = .authorizing(provider, grantType)
         case .deviceCode:
             state = .requestingDeviceCode(provider)
-            Task.immediate {
-                await requestDeviceCode(provider: provider)
+            let operation = { @Sendable in
+                await self.requestDeviceCode(provider: provider)
+            }
+            if #available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *) {
+                Task.immediate(operation: operation)
+            } else {
+                Task(priority: .high, operation: operation)
             }
         case .clientCredentials:
-            Task.immediate {
-                await requestClientCredentials(provider: provider)
+            let operation = { @Sendable in
+                await self.requestClientCredentials(provider: provider)
+            }
+            if #available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *) {
+                Task.immediate(operation: operation)
+            } else {
+                Task(priority: .high, operation: operation)
             }
         case .refreshToken:
-            Task.immediate {
-                await refreshToken(provider: provider)
+            let operation = { @Sendable in
+                await self.refreshToken(provider: provider)
+            }
+            if #available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *) {
+                Task.immediate(operation: operation)
+            } else {
+                Task(priority: .high, operation: operation)
             }
         }
     }
@@ -138,8 +153,13 @@ public extension OAuth {
     ///   - code: the code to exchange
     ///   - pkce: the pkce data
     func token(provider: Provider, code: String, pkce: PKCE? = nil) {
-        Task.immediate {
-            await requestToken(provider: provider, code: code, pkce: pkce)
+        let operation = { @Sendable in
+            await self.requestToken(provider: provider, code: code, pkce: pkce)
+        }
+        if #available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *) {
+            Task.immediate(operation: operation)
+        } else {
+            Task(priority: .high, operation: operation)
         }
     }
 
@@ -234,7 +254,12 @@ private extension OAuth {
         #if os(macOS) || os(iOS) || os(visionOS)
         let localizedReason = context.localizedReason.isNotEmpty ? context.localizedReason: defaultAuthenticationWithBiometricsOrCompanionReason
         #if os(macOS) || os(iOS)
-        let policy: LAPolicy = .deviceOwnerAuthenticationWithBiometricsOrCompanion
+        let policy: LAPolicy =
+            if #available(iOS 18, macOS 15, *) {
+                .deviceOwnerAuthenticationWithBiometricsOrCompanion
+            } else {
+                .deviceOwnerAuthenticationWithBiometricsOrWatch
+            }
         #else
         let policy: LAPolicy = .deviceOwnerAuthenticationWithBiometrics
         #endif
@@ -242,10 +267,15 @@ private extension OAuth {
         if context.canEvaluatePolicy(policy, error: &error) {
             context.evaluatePolicy(policy, localizedReason: localizedReason) { [weak self] success, error in
                 guard let self else { return }
-                Task.immediate { @MainActor in
+                let operation = { @MainActor in
                     if success {
                         self.loadAuthorizations()
                     }
+                }
+                if #available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *) {
+                    Task.immediate(operation: operation)
+                } else {
+                    Task(priority: .high, operation: operation)
                 }
             }
         }
@@ -308,9 +338,14 @@ private extension OAuth {
                     }
                     tasks.append(task)
                 } else {
+                    let operation = { @Sendable in
+                        await self.refreshToken(provider: provider)
+                    }
                     // Execute the task immediately
-                    Task.immediate {
-                        await refreshToken(provider: provider)
+                    if #available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *) {
+                        Task.immediate(operation: operation)
+                    } else {
+                        Task(priority: .high, operation: operation)
                     }
                 }
             }
