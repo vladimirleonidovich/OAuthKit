@@ -258,7 +258,11 @@ private extension OAuth {
             if #available(iOS 18, macOS 15, *) {
                 .deviceOwnerAuthenticationWithBiometricsOrCompanion
             } else {
+                #if os(macOS)
                 .deviceOwnerAuthenticationWithBiometricsOrWatch
+                #else
+                .deviceOwnerAuthenticationWithBiometrics
+                #endif
             }
         #else
         let policy: LAPolicy = .deviceOwnerAuthenticationWithBiometrics
